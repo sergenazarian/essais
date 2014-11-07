@@ -1,0 +1,218 @@
+1***********************************************
+
+/*
+ *
+ * GccBoardProject1
+ *
+ * Par Serge Nazarian
+ * Le 24 octobre 2014
+ * Ce programme fait clignoter alternativement les deux Leds à une fréquence ajustable.
+ * Il utilise la librairie delay.
+ *
+ *
+ */
+
+#include "asf.h"
+#include "conf_board.h"
+#include "conf_clock.h"
+#include "delay.h"
+
+#define Led1 LED0_GPIO
+#define Led2 LED1_GPIO
+
+int main (void)
+{
+	sysclk_init();
+	board_init();
+	
+	
+	int delai = 1000;
+	while (1){
+	LED_On(Led1);
+	LED_Off(Led2);	
+	delay_ms(delai);
+	LED_Off(Led1);
+	LED_On(Led2);
+	delay_ms(delai);	
+	}
+}
+
+2***********************************************
+
+/*
+ *
+ * GccBoardProject2
+ *
+ * Par Serge Nazarian
+ * Le 24 octobre 2014
+ * Ce programme fait clignoter alternativement les deux Leds à une fréquence ajustable.
+ * Il n'utilise pas la librairie delay.
+ *
+*/
+
+#include "asf.h"
+#include "conf_board.h"
+#include "conf_clock.h"
+
+#define Led1 LED0_GPIO
+#define Led2 LED1_GPIO
+
+void attente (unsigned int delai);
+void attente (unsigned int delai) {
+	//delai est en ms
+  volatile unsigned int i;
+  unsigned int j;
+  for (j=0;j<delai;j++) {
+	  for (i=0;i<10000;i++) {}
+  } 	
+}
+
+
+int main (void)
+{
+	sysclk_init();
+	board_init();
+	/*
+	//Ceci sert à étalonner la fonction attente avec un chronomètre
+	while (1){
+		LED_On(Led1);
+		attente(10000);//10 s
+		LED_Off(Led1);
+		attente(10000);//10s
+	}
+	*/
+	
+	LED_Off(Led1);
+	LED_Off(Led2);
+	int compteur1=0;
+	int compteur2=0;
+		
+	while (1){
+		if (compteur1==0) {LED_Toggle(Led1);}
+		compteur1++;	
+		if (compteur1==250) compteur1=0; // x Hz
+		if (compteur2==0) {LED_Toggle(Led2);}
+		compteur2++;
+		if (compteur2==166) {compteur2=0;}// 3/2x Hz, led2 clignote à1.5 fois plus vite que led1
+		attente(1);	//1 ms
+	}
+}
+
+3***********************************************
+
+/*
+ *
+ * Nom du projet : Essai d'utilisation de  bouton
+ *
+ * Par Serge Nazarian
+ * Le 25 octobre 2014
+ * Objet : L'appui sur le bouton fait commuter l'affichage des leds.
+ * Bouton relaché -> Led1 éteinte et Led2 allumée
+ * Bouton appuyé -> Led1  allumée et Led2 éteinte
+ * 
+ *
+ *
+*/
+
+#include "asf.h"
+#include "conf_board.h"
+//#include "conf_clock.h"
+
+#define IRQ_PRIOR_PIO    0
+
+static void ProcessButtonEvt(uint8_t uc_button)
+{
+	if (uc_button == 0) {
+		gpio_toggle_pin(LED0_GPIO);
+		gpio_toggle_pin(LED1_GPIO);
+	}
+}
+
+static void Button1_Handler(uint32_t id, uint32_t mask)
+{
+	if (PIN_PUSHBUTTON_1_ID == id && PIN_PUSHBUTTON_1_MASK == mask) {
+		ProcessButtonEvt(0);
+	}
+}
+
+static void configure_buttons(void)
+{
+	pmc_enable_periph_clk(PIN_PUSHBUTTON_1_ID);
+	pio_set_debounce_filter(PIN_PUSHBUTTON_1_PIO, PIN_PUSHBUTTON_1_MASK, 10);
+	/* Interrupt on rising edge  */
+	pio_handler_set(PIN_PUSHBUTTON_1_PIO, PIN_PUSHBUTTON_1_ID,
+			PIN_PUSHBUTTON_1_MASK, PIN_PUSHBUTTON_1_ATTR, Button1_Handler);
+	NVIC_EnableIRQ((IRQn_Type) PIN_PUSHBUTTON_1_ID);
+	pio_handler_set_priority(PIN_PUSHBUTTON_1_PIO,
+			(IRQn_Type) PIN_PUSHBUTTON_1_ID, IRQ_PRIOR_PIO);
+	pio_enable_interrupt(PIN_PUSHBUTTON_1_PIO, PIN_PUSHBUTTON_1_MASK);
+}
+
+int main (void)
+{
+	//sysclk_init();
+	board_init();
+	
+	configure_buttons();
+	LED_On(LED0_GPIO);
+	LED_Off(LED1_GPIO);
+	
+	
+	
+	while(1){
+	    }
+}
+
+4***********************************************
+
+/*
+ *
+ * Nom du projet : essai_bas-niveau
+ *
+ * Auteur : Serge Nazarian
+ * Date : 
+ * Objet : L'appui sue le bouton fait commuter l'affichage des Leds.
+ * Bouton relaché -> Led1 éteinte et Led2 allumée
+  * Bouton appuyé -> Led1  allumée et Led2 éteinte
+ * Remarques : 
+ *
+ *
+*/
+
+#include <gpio.h>
+#include <ioport.h>
+
+int main (void)
+{
+	board_init();
+	
+	//#define Led1		IOPORT_CREATE_PIN(PIOC, 10)
+	//#define Led1		(PIO_PC10_IDX)
+	#define Led1		(74) //2*32+10=74
+	//#define Led2		IOPORT_CREATE_PIN(PIOC, 17)
+	//#define Led2		(PIO_PC17_IDX) 
+	#define Led2		(81) //2*32+17=81
+	
+	//#define Bouton	IOPORT_CREATE_PIN(PIOA, 5)
+	//#define Bouton	(PIO_PA5_IDX) //0*32+5=5
+	#define Bouton      (5) //0*32+5=5
+	
+	bool appui_bouton;
+	while (1)
+	{
+		appui_bouton = ioport_get_pin_level(Bouton);
+		if (appui_bouton) {
+			gpio_set_pin_high(Led1);
+			//pio_set_pin_high(Led1);
+			gpio_set_pin_low(Led2);
+			//pio_set_pin_low(Led2);
+		}
+		else {
+			//gpio_set_pin_low(Led1);
+			pio_set_pin_low(Led1);
+			//gpio_set_pin_high(Led2);
+			pio_set_pin_high(Led2);		
+		}
+	}
+}
+
